@@ -1,0 +1,13 @@
+{
+    "name": "x2media-server",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "X2 媒体下载器 · fnOS 应用服务端",
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "start": "node server.js"
+    }
+}

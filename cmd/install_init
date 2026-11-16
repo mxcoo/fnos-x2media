@@ -1,0 +1,5 @@
+#!/bin/bash
+# 安装前：仅记录日志。真正的准备工作在 install_callback。
+echo "[install_init] begin at $(date '+%F %T')"
+echo "[install_init] appdest=${TRIM_APPDEST} var=${TRIM_PKGVAR}"
+exit 0

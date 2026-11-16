@@ -1,0 +1,13 @@
+appname               = x2media
+version               = 1.0.3
+display_name          = X2 媒体下载器
+desc                  = 粘贴 X（Twitter）推文链接，批量把视频与图片保存到 NAS。内置多线路回退与代理支持。
+platform              = all
+source                = thirdparty
+maintainer            = YG
+maintainer_url        = https://x2twitter.com
+distributor           = YG
+os_min_version        = 0.9.0
+desktop_uidir         = ui
+desktop_applaunchname = x2media.Application
+service_port          = 8787

@@ -1,0 +1,14 @@
+#!/bin/bash
+# 升级后：补一次运行时检查，然后拉起服务
+set -u
+echo "[upgrade_callback] begin"
+chmod +x "${TRIM_APPDEST}"/cmd/* 2>/dev/null
+if [ ! -x "${TRIM_PKGVAR}/runtime/node/bin/node" ]; then
+    if [ -x "$(command -v node 2>/dev/null)" ]; then
+        command -v node > "${TRIM_PKGVAR}/node.path"
+    else
+        "${TRIM_APPDEST}/cmd/install_callback" || echo "[upgrade_callback] 运行时准备失败"
+    fi
+fi
+"${TRIM_APPDEST}/cmd/main" start
+exit 0

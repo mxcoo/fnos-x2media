@@ -1,0 +1,21 @@
+#!/bin/bash
+# 修改配置后：把向导里的下载目录写进 settings.json，并重启服务
+set -u
+NODE="$(cat "${TRIM_PKGVAR}/node.path" 2>/dev/null || command -v node 2>/dev/null)"
+echo "[config_callback] root=${wizard_root:-<未设置>} node=${NODE}"
+
+if [ -n "${wizard_root:-}" ] && [ -n "$NODE" ]; then
+    mkdir -p "${TRIM_PKGVAR}"
+    "$NODE" -e '
+const fs = require("fs");
+const file = process.argv[1];
+const root = process.argv[2];
+let s = {};
+try { s = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
+s.root = root;
+fs.writeFileSync(file, JSON.stringify(s, null, 4) + "\n");
+' "${TRIM_PKGVAR}/settings.json" "${wizard_root}" && echo "[config_callback] settings.json 已更新"
+fi
+
+"${TRIM_APPDEST}/cmd/main" restart
+exit 0

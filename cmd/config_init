@@ -1,0 +1,4 @@
+#!/bin/bash
+# 修改配置前：记录当前值
+echo "[config_init] current root=${wizard_root:-<未设置>}"
+exit 0

@@ -1,0 +1,24 @@
+[
+    {
+        "stepTitle": "数据处理",
+        "items": [
+            {
+                "type": "select",
+                "field": "wizard_data_action",
+                "label": "已下载的文件和设置",
+                "helpText": "「保留」只删除程序，下载的文件与设置留在原处；「删除」会连同应用私有目录一起清空。你自己指定的下载目录不会被删除。",
+                "initValue": "keep",
+                "options": [
+                    {
+                        "label": "保留数据（推荐）",
+                        "value": "keep"
+                    },
+                    {
+                        "label": "删除应用数据",
+                        "value": "delete"
+                    }
+                ]
+            }
+        ]
+    }
+]

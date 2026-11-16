@@ -1,0 +1,151 @@
+#!/bin/bash
+# X2 媒体下载器 · 服务控制
+#   cmd/main start | stop | status | restart
+# 约定：status 运行中 exit 0，未运行 exit 3（fnOS 依赖这个返回值）
+set -u
+
+APPNAME="x2media"
+APP_DIR="${TRIM_APPDEST}"
+VAR_DIR="${TRIM_PKGVAR}"
+LOG_FILE="${VAR_DIR}/info.log"
+PID_FILE="${VAR_DIR}/app.pid"
+PORT_FILE="${VAR_DIR}/port"
+DEFAULT_PORT=8787
+
+mkdir -p "${VAR_DIR}" 2>/dev/null
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
+}
+
+app_version() {
+    local v
+    v="$(grep -iE '^[[:space:]]*version[[:space:]]*=' "${APP_DIR}/manifest" 2>/dev/null | head -n1 | sed 's/.*=[[:space:]]*//' | tr -d '\r')"
+    [ -n "$v" ] || v="1.0.0"
+    echo "$v"
+}
+
+resolve_node() {
+    local v
+    if [ -r "${VAR_DIR}/node.path" ]; then
+        v="$(head -n1 "${VAR_DIR}/node.path" | tr -d '[:space:]')"
+        [ -x "$v" ] && { echo "$v"; return 0; }
+    fi
+    for candidate in "${VAR_DIR}/runtime/node/bin/node" "$(command -v node 2>/dev/null)"; do
+        [ -n "$candidate" ] && [ -x "$candidate" ] && { echo "$candidate"; return 0; }
+    done
+    return 1
+}
+
+resolve_port() {
+    if [ -n "${X2_PORT:-}" ]; then echo "$X2_PORT"; return; fi
+    local p=""
+    if [ -r "${PORT_FILE}" ]; then
+        p="$(head -n1 "${PORT_FILE}" | tr -d '[:space:]')"
+    fi
+    echo "${p:-$DEFAULT_PORT}"
+}
+
+is_running() {
+    if [ -r "${PID_FILE}" ]; then
+        local pid
+        pid="$(head -n1 "${PID_FILE}" | tr -d '[:space:]')"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        rm -f "${PID_FILE}"
+    fi
+    return 1
+}
+
+start_process() {
+    if is_running; then
+        log_msg "already running, pid=$(cat "${PID_FILE}")"
+        return 0
+    fi
+
+    local node port
+    if ! node="$(resolve_node)"; then
+        log_msg "ERROR: 找不到 Node 运行时，无法启动（重装或手动放置 ${VAR_DIR}/runtime/node/bin/node）"
+        return 1
+    fi
+    port="$(resolve_port)"
+
+    echo "$port" > "${PORT_FILE}"
+    log_msg "starting ${APPNAME} v$(app_version) node=${node} port=${port}"
+
+    cd "${APP_DIR}" || return 1
+    X2_PORT="$port" \
+    X2_VAR="${VAR_DIR}" \
+    X2_APPDEST="${APP_DIR}" \
+    X2_VERSION="$(app_version)" \
+    nohup "$node" "${APP_DIR}/server/server.js" >> "${LOG_FILE}" 2>&1 &
+
+    local pid=$!
+    printf "%s" "$pid" > "${PID_FILE}"
+    sleep 1
+
+    if kill -0 "$pid" 2>/dev/null; then
+        log_msg "started, pid=${pid}"
+        return 0
+    fi
+    log_msg "ERROR: 进程启动后立即退出，见日志 ${LOG_FILE}"
+    rm -f "${PID_FILE}"
+    return 1
+}
+
+stop_process() {
+    if ! is_running; then
+        rm -f "${PID_FILE}"
+        log_msg "not running"
+        return 0
+    fi
+
+    local pid
+    pid="$(head -n1 "${PID_FILE}" | tr -d '[:space:]')"
+    log_msg "stopping pid=${pid}"
+    kill -TERM "$pid" 2>/dev/null
+
+    local count=0
+    while kill -0 "$pid" 2>/dev/null && [ $count -lt 10 ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        log_msg "force kill pid=${pid}"
+        kill -KILL "$pid" 2>/dev/null
+        sleep 1
+    fi
+
+    rm -f "${PID_FILE}"
+    log_msg "stopped"
+    return 0
+}
+
+case "${1:-}" in
+    start)
+        start_process
+        exit $?
+        ;;
+    stop)
+        stop_process
+        exit $?
+        ;;
+    restart)
+        stop_process
+        start_process
+        exit $?
+        ;;
+    status)
+        if is_running; then
+            exit 0
+        else
+            exit 3
+        fi
+        ;;
+    *)
+        echo "usage: $0 {start|stop|status|restart}"
+        exit 1
+        ;;
+esac

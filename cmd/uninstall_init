@@ -1,0 +1,5 @@
+#!/bin/bash
+# 卸载前：停服务
+echo "[uninstall_init] stopping service"
+"${TRIM_APPDEST}/cmd/main" stop
+exit 0

@@ -1,0 +1,17 @@
+#!/bin/bash
+# 卸载后：数据是否删除由向导变量 data_action 决定（keep 保留 / delete 删除）
+set -u
+ACTION="${wizard_data_action:-keep}"
+echo "[uninstall_callback] data_action=${ACTION} var=${TRIM_PKGVAR}"
+
+# 便携运行时总是清掉，它只服务于本应用
+rm -rf "${TRIM_PKGVAR}/runtime" 2>/dev/null
+rm -f "${TRIM_PKGVAR}/node.path" "${TRIM_PKGVAR}/app.pid" 2>/dev/null
+
+if [ "$ACTION" = "delete" ]; then
+    echo "[uninstall_callback] 删除全部数据：${TRIM_PKGVAR}"
+    rm -rf "${TRIM_PKGVAR}" 2>/dev/null
+else
+    echo "[uninstall_callback] 保留数据：${TRIM_PKGVAR}"
+fi
+exit 0

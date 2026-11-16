@@ -1,0 +1,20 @@
+[
+    {
+        "stepTitle": "下载位置",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_root",
+                "label": "下载目录",
+                "helpText": "媒体文件保存的绝对路径，例如 /vol1/1000/media/x2media。留空则使用应用私有目录，之后可在应用内「设置」里修改。",
+                "initValue": "",
+                "rules": [
+                    {
+                        "pattern": "^$|^/.*$",
+                        "message": "请填写以 / 开头的绝对路径，或留空"
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -1,0 +1,112 @@
+#!/bin/bash
+# 安装后：建可写目录 + 准备 Node 运行时（系统没有 node 时下载便携版）
+set -u
+
+NODE_VER="${X2_NODE_VERSION:-v22.11.0}"
+MIRROR="${X2_NODE_MIRROR:-https://registry.npmmirror.com/-/binary/node}"
+RUNTIME_DIR="${TRIM_PKGVAR}/runtime"
+NODE_BIN="${RUNTIME_DIR}/node/bin/node"
+
+log() { echo "[install_callback] $*"; }
+
+log "appdest=${TRIM_APPDEST} var=${TRIM_PKGVAR}"
+
+mkdir -p "${TRIM_PKGVAR}"/{downloads,logs,cache} || {
+    log "创建数据目录失败"
+    exit 1
+}
+chmod 755 "${TRIM_PKGVAR}" 2>/dev/null
+
+# 安装目录里的启动脚本保证可执行
+chmod +x "${TRIM_APPDEST}"/cmd/* 2>/dev/null
+chmod -R a+r "${TRIM_APPDEST}/app" 2>/dev/null
+
+# 安装向导里填了下载目录就落到 settings.json，之后应用内设置可以直接改
+apply_wizard_root() {
+    local node_bin="$1"
+    [ -n "${wizard_root:-}" ] || return 0
+    [ -n "$node_bin" ] || return 0
+    if "$node_bin" -e '
+const fs = require("fs");
+const [file, root] = process.argv.slice(1);
+let s = {};
+try { s = JSON.parse(fs.readFileSync(file, "utf8")); } catch {}
+s.root = root;
+fs.writeFileSync(file, JSON.stringify(s, null, 4) + "\n");
+' "${TRIM_PKGVAR}/settings.json" "${wizard_root}"; then
+        log "下载目录写入 settings.json：${wizard_root}"
+    else
+        log "写入 settings.json 失败，可在应用内设置里手动指定"
+    fi
+}
+
+usable_node() {
+    local bin="$1"
+    [ -n "$bin" ] || return 1
+    [ -x "$bin" ] || command -v "$bin" >/dev/null 2>&1 || return 1
+    local major
+    major="$("$bin" -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null)"
+    [ -n "$major" ] && [ "$major" -ge 18 ] 2>/dev/null
+}
+
+if usable_node "${NODE_BIN}"; then
+    log "已存在便携运行时：$(${NODE_BIN} -v)"
+    echo "${NODE_BIN}" > "${TRIM_PKGVAR}/node.path"
+    apply_wizard_root "${NODE_BIN}"
+    exit 0
+fi
+
+if usable_node "$(command -v node 2>/dev/null)"; then
+    log "使用系统 node：$(command -v node) $(node -v)"
+    command -v node > "${TRIM_PKGVAR}/node.path"
+    apply_wizard_root "$(command -v node)"
+    exit 0
+fi
+
+case "$(uname -m)" in
+    x86_64|amd64) ARCH=x64 ;;
+    aarch64|arm64) ARCH=arm64 ;;
+    *) log "不支持的架构 $(uname -m)"; exit 1 ;;
+esac
+
+PKG="node-${NODE_VER}-linux-${ARCH}"
+URL="${MIRROR}/${NODE_VER}/${PKG}.tar.gz"
+TMP="${TRIM_PKGVAR}/cache/${PKG}.tar.gz"
+
+log "下载 Node 运行时：${URL}"
+mkdir -p "${TRIM_PKGVAR}/cache"
+
+try_download() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -fL --connect-timeout 20 --retry 2 --retry-delay 2 -o "$TMP" "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -O "$TMP" "$1"
+    else
+        return 1
+    fi
+}
+
+if ! try_download "$URL"; then
+    ALT="https://nodejs.org/dist/${NODE_VER}/${PKG}.tar.gz"
+    log "镜像失败，改用官方源：${ALT}"
+    try_download "$ALT" || { log "Node 下载失败，请手动放置 ${NODE_BIN}"; exit 1; }
+fi
+
+mkdir -p "${RUNTIME_DIR}"
+tar -xzf "$TMP" -C "${RUNTIME_DIR}" || { log "解压失败"; exit 1; }
+rm -f "$TMP"
+
+# tar 解出的是 ${RUNTIME_DIR}/${PKG}，挂成 ${RUNTIME_DIR}/node
+if [ -d "${RUNTIME_DIR}/${PKG}" ] && [ ! -e "${RUNTIME_DIR}/node" ]; then
+    mv "${RUNTIME_DIR}/${PKG}" "${RUNTIME_DIR}/node"
+fi
+
+if usable_node "${NODE_BIN}"; then
+    log "运行时就绪：$(${NODE_BIN} -v)"
+    echo "${NODE_BIN}" > "${TRIM_PKGVAR}/node.path"
+    apply_wizard_root "${NODE_BIN}"
+    exit 0
+fi
+
+log "运行时校验失败"
+exit 1

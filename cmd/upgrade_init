@@ -1,0 +1,5 @@
+#!/bin/bash
+# 升级前：先停服务，避免新旧代码混跑
+echo "[upgrade_init] stopping service"
+"${TRIM_APPDEST}/cmd/main" stop
+exit 0
